@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".MainActivity">
+
+
+    <item
+        android:id="@+id/action_favourite"
+        android:icon="@drawable/ic_heart_icon"
+        android:orderInCategory="300"
+        android:title="favourite"
+        app:showAsAction="ifRoom"></item>
+
+    <item
+        android:id="@+id/action_cloud"
+        android:icon="@drawable/ic_localization_icon"
+        android:orderInCategory="300"
+        android:title="Localize me"
+        app:showAsAction="ifRoom"></item>
+
+
+</menu>

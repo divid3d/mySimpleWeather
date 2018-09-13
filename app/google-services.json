@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "651364265653",
+    "firebase_url": "https://mysimpleweather-be2af.firebaseio.com",
+    "project_id": "mysimpleweather-be2af",
+    "storage_bucket": "mysimpleweather-be2af.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651364265653:android:bfe8060351240075",
+        "android_client_info": {
+          "package_name": "com.example.divided.mysimpleweather"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "651364265653-7ur5c74l29n33ll4ctc07n9ug65ocog2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA2k3xeECh_qVZbyF6KIp7hlPhNgcneYDk"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

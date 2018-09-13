@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">apisTest</string>
+    <string name="click_me">Click me</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+</resources>
