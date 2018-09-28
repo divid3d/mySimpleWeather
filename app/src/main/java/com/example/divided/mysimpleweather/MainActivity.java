@@ -3,6 +3,7 @@ package com.example.divided.mysimpleweather;
 
 import android.annotation.TargetApi;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -12,12 +13,12 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.view.GravityCompat;
+import android.support.v4.content.res.ResourcesCompat;
 import android.support.v4.view.ViewPager;
-import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -44,11 +45,22 @@ import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
 import com.google.android.gms.location.places.ui.PlaceSelectionListener;
+import com.mikepenz.materialdrawer.Drawer;
+import com.mikepenz.materialdrawer.DrawerBuilder;
+import com.mikepenz.materialdrawer.model.DividerDrawerItem;
+import com.mikepenz.materialdrawer.model.ExpandableDrawerItem;
+import com.mikepenz.materialdrawer.model.PrimaryDrawerItem;
+import com.mikepenz.materialdrawer.model.SecondaryDrawerItem;
+import com.mikepenz.materialdrawer.model.interfaces.IDrawerItem;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static android.Manifest.permission.ACCESS_COARSE_LOCATION;
@@ -65,10 +77,10 @@ public class MainActivity extends AppCompatActivity implements
     public ListenFromActivity activityListenerFragmentOne;
     public ListenFromActivity activityListinerFragmentTwo;
     Location mLocation;
-    TextView latLng;
     GoogleApiClient mGoogleApiClient;
     RequestQueue requestQueue;
     View currentWeatherView;
+    //ExpandableDrawerItem itemFavourites;
     private long UPDATE_INTERVAL = 15000;  /* 15 secs */
     private long FASTEST_INTERVAL = 5000; /* 5 secs */
     private ArrayList<String> permissionsToRequest;
@@ -76,6 +88,8 @@ public class MainActivity extends AppCompatActivity implements
     private ArrayList<String> permissions = new ArrayList<>();
     private double currentLatitude;
     private double currentLongitude;
+    private String currentCity;
+    private String currentCountry;
     private TextView mCurrentTemp, mDescription, mMaxTemp, mMinTemp, mCity, mCounty, mHumidity, mPressure, mWindSpeed, mDate, mDay, mSunrise, mSunset, mLastUpdate;
     private android.support.v7.widget.Toolbar mTopToolbar;
     private SwipeRefreshLayout mSwipeToRefresh;
@@ -83,9 +97,101 @@ public class MainActivity extends AppCompatActivity implements
     private ImageView mWindDirection;
     private TabLayout mTabs;
     private ViewPager mViewPager;
-    private DrawerLayout mDrawerLayout;
     private OpenWeatherMaps myApiManager;
     private EditText mGoogleSearch;
+    private Drawer mDrawer;
+
+
+    public void addNewFavourite() {
+        SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+        if (!sharedPreferences.contains(currentCity + "," + currentCountry)) {
+            sharedPreferences.edit().putString(currentCity + "," + currentCountry, String.valueOf(currentLatitude) + "," + String.valueOf(currentLongitude)).commit();
+            List<IDrawerItem> favouritesList = mDrawer.getDrawerItem(1).getSubItems();
+            final int oldFavouritesCount = favouritesList.size();
+            favouritesList.add(new SecondaryDrawerItem().withName(currentCity + "," + currentCountry).withLevel(2)
+                    .withTag(currentCity + "," + currentCountry)
+                    .withTypeface(ResourcesCompat.getFont(this, R.font.product_sans_regular))
+                    .withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
+                        @Override
+                        public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
+                            SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+                            if (sharedPreferences.contains(drawerItem.getTag().toString())) {
+                                String cordinates = sharedPreferences.getString(drawerItem.getTag().toString(), null);
+                                if (cordinates != null) {
+                                    final String[] separatedCordinates = cordinates.split(",");
+                                    currentLatitude = Double.parseDouble(separatedCordinates[0]);
+                                    currentLongitude = Double.parseDouble(separatedCordinates[1]);
+                                    getWeather();
+                                }
+                            }
+                            return false;
+                        }
+                    }));
+            Collections.sort(favouritesList, (IDrawerItem i1, IDrawerItem i2) -> i1.getTag().toString().compareTo(i2.getTag().toString()));
+            if (mDrawer.getDrawerItem(1).isExpanded()) { // Without this line I have some sub items twice
+                mDrawer.getExpandableExtension().notifyAdapterSubItemsChanged(
+                        1, oldFavouritesCount);
+            }
+            mTopToolbar.getMenu().getItem(0).setIcon(R.drawable.ic_heart_icon);
+        }
+    }
+
+    public void removeFavourite() {
+        SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+        if (sharedPreferences.contains(currentCity + "," + currentCountry)) {
+            sharedPreferences.edit().remove(currentCity + "," + currentCountry).commit();
+            final int oldFavouritesCount = mDrawer.getDrawerItem(1).getSubItems().size();
+            List<IDrawerItem> list = mDrawer.getDrawerItem(1).getSubItems();
+            int favouriteIndex = -1;
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).getTag().equals(currentCity + "," + currentCountry)) {
+                    favouriteIndex = i;
+                }
+            }
+
+            if (favouriteIndex > -1) {
+                mDrawer.getDrawerItem(1).getSubItems().remove(favouriteIndex);
+            }
+            if (mDrawer.getDrawerItem(1).isExpanded()) { // Without this line I have some sub items twice
+                mDrawer.getExpandableExtension().notifyAdapterSubItemsChanged(
+                        1, oldFavouritesCount);
+            }
+            mTopToolbar.getMenu().getItem(0).setIcon(R.drawable.ic_heart_border);
+        }
+    }
+
+    public void loadAllFavouritesToDrawer() {
+        if (mDrawer.getDrawerItem(1) == null) {
+            SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+            Map<String, ?> allEntries = sharedPreferences.getAll();
+            List<IDrawerItem> favourites = new LinkedList<>();
+            for (Map.Entry<String, ?> entry : allEntries.entrySet()) {
+                favourites.add(new SecondaryDrawerItem().withName(entry.getKey()).withLevel(2).withTag(entry.getKey())
+                        .withTypeface(ResourcesCompat.getFont(this, R.font.product_sans_regular))
+                        .withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
+                            @Override
+                            public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
+                                SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+                                if (sharedPreferences.contains(drawerItem.getTag().toString())) {
+                                    String cordinates = sharedPreferences.getString(drawerItem.getTag().toString(), null);
+                                    if (cordinates != null) {
+                                        final String[] separatedCordinates = cordinates.split(",");
+                                        currentLatitude = Double.parseDouble(separatedCordinates[0]);
+                                        currentLongitude = Double.parseDouble(separatedCordinates[1]);
+                                        getWeather();
+                                    }
+                                }
+                                return false;
+                            }
+                        }));
+            }
+            Collections.sort(favourites, (IDrawerItem i1, IDrawerItem i2) -> i1.getTag().toString().compareTo(i2.getTag().toString()));
+            mDrawer.addItem(new ExpandableDrawerItem().withName("Favourites").withIdentifier(1).withSubItems(favourites).withIcon(R.drawable.ic_heart_icon_grey).withSelectable(false)
+                    .withTypeface(ResourcesCompat.getFont(this, R.font.product_sans_bold)));
+            mDrawer.addItem(new DividerDrawerItem());
+            mDrawer.getAdapter().notifyAdapterDataSetChanged();
+        }
+    }
 
     public void setActivityListenerFragmentOne(ListenFromActivity activityListener) {
         this.activityListenerFragmentOne = activityListener;
@@ -112,9 +218,26 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         permissions.add(ACCESS_FINE_LOCATION);
         permissions.add(ACCESS_COARSE_LOCATION);
+
+
+        mDrawer = new DrawerBuilder()
+                .withActivity(this)
+                .withTranslucentStatusBar(false)
+                .withActionBarDrawerToggle(false)
+                .withSelectedItem(-1)
+                .withHeaderDivider(true)
+                .withHeader(R.layout.navbar_header)
+                .withDisplayBelowStatusBar(true)
+                .withInnerShadow(true)
+                .withTranslucentStatusBar(true)
+                .build();
+
+
+        loadAllFavouritesToDrawer();
+        mDrawer.addItem(new PrimaryDrawerItem().withName("Settings").withIdentifier(2).withIcon(R.drawable.ic_sound_cloud_grey).withSelectable(false));
+        mDrawer.addItem(new DividerDrawerItem());
 
         permissionsToRequest = findUnAskedPermissions(permissions);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -129,6 +252,7 @@ public class MainActivity extends AppCompatActivity implements
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
+
 
         currentWeatherView = findViewById(R.id.includedLayout);
         mCurrentTemp = currentWeatherView.findViewById(R.id.tv_currentTemp);
@@ -149,8 +273,6 @@ public class MainActivity extends AppCompatActivity implements
         mLastUpdate = currentWeatherView.findViewById(R.id.tv_last_update);
         mTabs = findViewById(R.id.tabs);
         mViewPager = findViewById(R.id.viewpager);
-        mDrawerLayout = findViewById(R.id.drawer_layout);
-
         currentWeatherView.setVisibility(View.INVISIBLE);
         mTabs.setVisibility(View.INVISIBLE);
         mViewPager.setVisibility(View.INVISIBLE);
@@ -163,29 +285,25 @@ public class MainActivity extends AppCompatActivity implements
                 getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
         places.setFilter(typeFilter);
 
-        mGoogleSearch = ((EditText) Objects.requireNonNull(places.getView()).findViewById(R.id.place_autocomplete_search_input));
+        mGoogleSearch = Objects.requireNonNull(places.getView())
+                .findViewById(R.id.place_autocomplete_search_input);
         mGoogleSearch.setTextColor(Color.WHITE);
+        mGoogleSearch.setEllipsize(TextUtils.TruncateAt.END);
+        mGoogleSearch.setMaxLines(1);
         mGoogleSearch.setHintTextColor(getResources().getColor(R.color.fadeOutWhite));
-        ((ImageView) places.getView().findViewById(R.id.place_autocomplete_search_button)).setColorFilter(Color.WHITE);
-        ((ImageView) places.getView().findViewById(R.id.place_autocomplete_clear_button)).setColorFilter(Color.WHITE);
+        ((ImageView) places.getView().findViewById(R.id.place_autocomplete_search_button))
+                .setColorFilter(Color.WHITE);
+        ((ImageView) places.getView().findViewById(R.id.place_autocomplete_clear_button))
+                .setColorFilter(Color.WHITE);
 
 
         places.setOnPlaceSelectedListener(new PlaceSelectionListener() {
             @Override
             public void onPlaceSelected(Place place) {
-
-                final double longitude = place.getLatLng().longitude;
-                final double latitude = place.getLatLng().latitude;
-                myApiManager.getCurrentWeather(latitude, longitude);
-                Calendar calendar = Calendar.getInstance();
-                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                String date = dateFormat.format(calendar.getTime());
-                if (null != activityListenerFragmentOne) {
-                    activityListenerFragmentOne.getWeatherByCordinates(longitude, latitude, date, true);
-                }
-                if (null != activityListinerFragmentTwo) {
-                    activityListinerFragmentTwo.getWeatherByCordinates(longitude, latitude, date, false);
-                }
+                currentLongitude = place.getLatLng().longitude;
+                currentLatitude = place.getLatLng().latitude;
+                getWeather();
+                mDrawer.setSelection(-1);
             }
 
             @Override
@@ -196,7 +314,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-        mSwipeToRefresh = (SwipeRefreshLayout) findViewById(R.id.swiperefresh);
+        mSwipeToRefresh = findViewById(R.id.swiperefresh);
         mSwipeToRefresh.setColorSchemeResources(
                 R.color.refresh_progress_1,
                 R.color.refresh_progress_2,
@@ -205,16 +323,7 @@ public class MainActivity extends AppCompatActivity implements
         mSwipeToRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                myApiManager.getCurrentWeather(currentLatitude, currentLongitude);
-                Calendar calendar = Calendar.getInstance();
-                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                String date = dateFormat.format(calendar.getTime());
-                if (null != activityListenerFragmentOne) {
-                    activityListenerFragmentOne.getWeatherByCordinates(currentLongitude, currentLatitude, date, true);
-                }
-                if (null != activityListinerFragmentTwo) {
-                    activityListinerFragmentTwo.getWeatherByCordinates(currentLongitude, currentLatitude, date, false);
-                }
+                getWeather();
                 mSwipeToRefresh.setRefreshing(false);
             }
         });
@@ -224,6 +333,8 @@ public class MainActivity extends AppCompatActivity implements
         myApiManager.setOnCurrentWeatherListener(new CurrentWeatherListener() {
             @Override
             public void getCurrentWeather(Weather weather) {
+                currentCity = weather.getCity();
+                currentCountry = weather.getCountry();
                 updateCurrentWeatherView(weather);
             }
         });
@@ -254,7 +365,6 @@ public class MainActivity extends AppCompatActivity implements
     protected void onResume() {
         super.onResume();
         if (!checkPlayServices()) {
-            latLng.setText("Please install Google Play services.");
         }
     }
 
@@ -270,11 +380,34 @@ public class MainActivity extends AppCompatActivity implements
         stopLocationUpdates();
     }
 
+    @Override
+    public void onBackPressed() {
+
+        if (mDrawer != null && mDrawer.isDrawerOpen()) {
+            mDrawer.closeDrawer();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     public void stopLocationUpdates() {
         if (mGoogleApiClient.isConnected()) {
             LocationServices.FusedLocationApi
                     .removeLocationUpdates(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
+        }
+    }
+
+    public void getWeather() {
+        myApiManager.getCurrentWeather(currentLatitude, currentLongitude);
+        Calendar calendar = Calendar.getInstance();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        String date = dateFormat.format(calendar.getTime());
+        if (null != activityListenerFragmentOne) {
+            activityListenerFragmentOne.getWeatherByCordinates(currentLongitude, currentLatitude, date, true);
+        }
+        if (null != activityListinerFragmentTwo) {
+            activityListinerFragmentTwo.getWeatherByCordinates(currentLongitude, currentLatitude, date, false);
         }
     }
 
@@ -316,10 +449,9 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onLocationChanged(Location location) {
-
         if (location != null) {
-            currentLongitude = mLocation.getLongitude();
-            currentLatitude = mLocation.getLatitude();
+            currentLongitude = location.getLongitude();
+            currentLatitude = location.getLatitude();
         }
 
     }
@@ -382,8 +514,6 @@ public class MainActivity extends AppCompatActivity implements
                 }
 
                 if (permissionsRejected.size() > 0) {
-
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         if (shouldShowRequestPermissionRationale(permissionsRejected.get(0).toString())) {
                             showMessageOKCancel("These permissions are mandatory for the application. Please allow access.",
@@ -398,7 +528,6 @@ public class MainActivity extends AppCompatActivity implements
                     }
 
                 }
-
                 break;
         }
 
@@ -425,28 +554,36 @@ public class MainActivity extends AppCompatActivity implements
         int id = item.getItemId();
 
         if (id == R.id.action_cloud) {
-            mGoogleSearch.getText().clear();
-            myApiManager.getCurrentWeather(currentLatitude, currentLongitude);
-            Calendar calendar = Calendar.getInstance();
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            String date = dateFormat.format(calendar.getTime());
-            if (null != activityListenerFragmentOne) {
-                activityListenerFragmentOne.getWeatherByCordinates(currentLongitude, currentLatitude, date, true);
-            }
-            if (null != activityListinerFragmentTwo) {
-                activityListinerFragmentTwo.getWeatherByCordinates(currentLongitude, currentLatitude, date, false);
-            }
+            mDrawer.setSelection(-1);
+            getWeather();
             return true;
         } else if (id == R.id.action_favourite) {
+            SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+            if (!sharedPreferences.contains(currentCity + "," + currentCountry)) {
+                addNewFavourite();
+            } else {
+                removeFavourite();
+            }
+            return true;
         } else if (id == android.R.id.home) {
-            mDrawerLayout.openDrawer(GravityCompat.START);
+            if (!mDrawer.isDrawerOpen()) {
+                mDrawer.openDrawer();
+            } else {
+                mDrawer.closeDrawer();
+            }
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-
     public void updateCurrentWeatherView(Weather weather) {
+        mGoogleSearch.getText().clear();
+        SharedPreferences sharedPreferences = getSharedPreferences("FAVOURITES", MODE_PRIVATE);
+        if (sharedPreferences.contains(currentCity + "," + currentCountry)) {
+            mTopToolbar.getMenu().getItem(0).setIcon(R.drawable.ic_heart_icon);
+        } else {
+            mTopToolbar.getMenu().getItem(0).setIcon(R.drawable.ic_heart_border);
+        }
         mCity.setText(weather.getCity());
         mCounty.setText(weather.getCountry());
         mCurrentTemp.setText(String.format("%.1f", weather.getCurrentTemp()).replaceAll(",", ".") + "°C");
@@ -470,9 +607,10 @@ public class MainActivity extends AppCompatActivity implements
         currentWeatherView.setVisibility(View.VISIBLE);
         mTabs.setVisibility(View.VISIBLE);
         mViewPager.setVisibility(View.VISIBLE);
-        RelativeLayout groupedLayout = (RelativeLayout) findViewById(R.id.groupedLayout);
+        RelativeLayout groupedLayout = findViewById(R.id.groupedLayout);
         groupedLayout.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(), R.anim.fall_down));
     }
+
 
     private void attachIcon(ImageView mWeatherIcon, String iconCode) {
         iconCode = iconCode.substring(0, iconCode.length() - 1);

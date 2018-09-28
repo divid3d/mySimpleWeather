@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/currentWeather"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -30,16 +29,22 @@
         android:id="@+id/tv_city"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
         android:layout_marginTop="8dp"
         android:background="@drawable/city_background"
+        android:ellipsize="end"
         android:fontFamily="@font/product_sans_bold"
+        android:gravity="end"
+        android:maxLines="1"
         android:paddingLeft="8dp"
         android:paddingRight="8dp"
         android:textColor="@android:color/white"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:translationZ="10dp"
+        android:translationZ="4dp"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintStart_toEndOf="@+id/tv_currentTemp"
         app:layout_constraintTop_toBottomOf="@+id/tv_last_update" />
 
     <TextView
